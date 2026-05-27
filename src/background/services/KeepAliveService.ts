@@ -1,8 +1,9 @@
 import { Logger } from '@/utils/logger';
+import { getBrowserAPI } from '@/utils/browserCompat';
 
 /**
  * Service to keep the extension's service worker active
- * Uses Chrome alarms API to periodically wake up the service worker
+ * Uses browser alarms API to periodically wake up the service worker
  */
 export class KeepAliveService {
   private static instance: KeepAliveService;
@@ -20,18 +21,30 @@ export class KeepAliveService {
   }
 
   async initialize(): Promise<void> {
-    await chrome.alarms.clear(this.ALARM_NAME);
+    const api = getBrowserAPI();
 
-    await chrome.alarms.create(this.ALARM_NAME, {
-      periodInMinutes: this.ALARM_INTERVAL_MINUTES,
-      delayInMinutes: 0,
-    });
+    // Clear any existing alarms first
+    try {
+      await api.alarms?.clear(this.ALARM_NAME);
+    } catch {
+      // Alarms might not exist, ignore
+    }
 
-    chrome.alarms.onAlarm.addListener(alarm => {
-      if (alarm.name === this.ALARM_NAME) {
-        this.handleKeepAlive();
-      }
-    });
+    // Create keep-alive alarm
+    try {
+      await api.alarms?.create(this.ALARM_NAME, {
+        periodInMinutes: this.ALARM_INTERVAL_MINUTES,
+        delayInMinutes: 0,
+      });
+
+      api.alarms?.onAlarm.addListener((alarm) => {
+        if (alarm.name === this.ALARM_NAME) {
+          this.handleKeepAlive();
+        }
+      });
+    } catch (error) {
+      this.logger.error('Failed to initialize keep-alive alarms', error);
+    }
 
     this.logger.info('Keep-alive service initialized');
   }
@@ -41,13 +54,19 @@ export class KeepAliveService {
     this.logger.debug('Keep-alive ping');
 
     // Perform a simple storage operation to ensure activity
-    chrome.storage.local.get(['lastPing'], _result => {
-      chrome.storage.local.set({ lastPing: Date.now() });
+    const api = getBrowserAPI();
+    api.storage.local.get(['lastPing'], (result: Record<string, any>) => {
+      api.storage.local.set({ lastPing: Date.now() });
     });
   }
 
   async destroy(): Promise<void> {
-    await chrome.alarms.clear(this.ALARM_NAME);
+    try {
+      const api = getBrowserAPI();
+      await api.alarms?.clear(this.ALARM_NAME);
+    } catch {
+      // Ignore errors during cleanup
+    }
     this.logger.info('Keep-alive service destroyed');
   }
 }

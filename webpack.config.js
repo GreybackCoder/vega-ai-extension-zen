@@ -6,8 +6,15 @@ const packageJson = require('./package.json');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
+  const targetBrowser = argv.target || 'chrome';
+  const isChrome = targetBrowser === 'chrome';
+  const isFirefox = targetBrowser === 'firefox';
 
-  return {
+  if (!isChrome && !isFirefox) {
+    throw new Error(`Invalid target browser: ${targetBrowser}. Use 'chrome' or 'firefox'.`);
+  }
+
+  const baseConfig = {
     mode: argv.mode || 'development',
     devtool: isProduction ? false : 'inline-source-map',
     entry: {
@@ -15,7 +22,7 @@ module.exports = (env, argv) => {
       popup: './src/popup/index.ts',
     },
     output: {
-      path: path.resolve(__dirname, 'dist'),
+      path: path.resolve(__dirname, `dist/${targetBrowser}`),
       filename: '[name]/index.js',
       clean: true,
     },
@@ -60,6 +67,7 @@ module.exports = (env, argv) => {
         'process.env.APP_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
         'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
         'process.env.APP_VERSION': JSON.stringify(packageJson.version),
+        'process.env.TARGET_BROWSER': JSON.stringify(targetBrowser),
       }),
       new MiniCssExtractPlugin({
         filename: 'styles/[name].css',
@@ -67,7 +75,7 @@ module.exports = (env, argv) => {
       new CopyPlugin({
         patterns: [
           {
-            from: 'src/manifest.json',
+            from: isChrome ? 'src/manifest.json' : 'src/manifest.firefox.json',
             to: 'manifest.json',
             transform(content) {
               const manifest = JSON.parse(content.toString());
@@ -90,4 +98,6 @@ module.exports = (env, argv) => {
       }),
     ],
   };
+
+  return baseConfig;
 };

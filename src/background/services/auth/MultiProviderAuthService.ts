@@ -5,6 +5,7 @@ import { AuthCredentials } from './IAuthProvider';
 import { AuthProviderFactory, AuthProviderConfig } from './AuthProviderFactory';
 import { authLogger } from '../../../utils/logger';
 import { MessageType } from '../message/IMessageService';
+import { getBrowserAPI } from '../../../utils/browserCompat';
 
 export class MultiProviderAuthService implements IAuthService {
   private factory: AuthProviderFactory;
@@ -195,20 +196,20 @@ export class MultiProviderAuthService implements IAuthService {
       }
     });
 
-    chrome.runtime
-      .sendMessage({
-        type: MessageType.AUTH_STATE_CHANGED,
-        payload: { isAuthenticated },
-      })
-      .catch(error => {
+    const sendPromise = getBrowserAPI().runtime.sendMessage({
+      type: MessageType.AUTH_STATE_CHANGED,
+      payload: { isAuthenticated },
+    });
+    if (sendPromise && typeof (sendPromise as Promise<unknown>).catch === 'function') {
+      (sendPromise as Promise<unknown>).catch((error: unknown) => {
+        const msg = error instanceof Error ? error.message : '';
         if (
-          !error.message?.includes('Could not establish connection') &&
-          !error.message?.includes('Receiving end does not exist')
+          !msg.includes('Could not establish connection') &&
+          !msg.includes('Receiving end does not exist')
         ) {
-          authLogger.warn('Failed to broadcast auth state to runtime', {
-            error: error.message,
-          });
+          authLogger.warn('Failed to broadcast auth state to runtime', { error: msg });
         }
       });
+    }
   }
 }

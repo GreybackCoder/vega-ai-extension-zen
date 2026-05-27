@@ -4,6 +4,7 @@ import {
   ExtensionMessage,
 } from './IMessageService';
 import { Logger } from '@/utils/logger';
+import { getBrowserAPI } from '@/utils/browserCompat';
 
 export class MessageService implements IMessageService {
   private handlers: Map<string, Set<MessageHandler>> = new Map();
@@ -12,7 +13,7 @@ export class MessageService implements IMessageService {
   private messageListener:
     | ((
         message: ExtensionMessage,
-        sender: chrome.runtime.MessageSender,
+        sender: any,
         sendResponse: (response?: unknown) => void
       ) => boolean)
     | null = null;
@@ -20,9 +21,11 @@ export class MessageService implements IMessageService {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
+    const api = getBrowserAPI();
+
     this.messageListener = (
       message: ExtensionMessage,
-      sender: chrome.runtime.MessageSender,
+      sender: any,
       sendResponse: (response?: unknown) => void
     ) => {
       const handlers = this.handlers.get(message.type);
@@ -52,14 +55,15 @@ export class MessageService implements IMessageService {
       return isAsync;
     };
 
-    chrome.runtime.onMessage.addListener(this.messageListener);
+    api.runtime.onMessage.addListener(this.messageListener);
 
     this.isInitialized = true;
   }
 
   async destroy(): Promise<void> {
     if (this.messageListener) {
-      chrome.runtime.onMessage.removeListener(this.messageListener);
+      const api = getBrowserAPI();
+      api.runtime.onMessage.removeListener(this.messageListener);
     }
     this.handlers.clear();
     this.isInitialized = false;
@@ -89,11 +93,19 @@ export class MessageService implements IMessageService {
   }
 
   async sendToTab(tabId: number, message: ExtensionMessage): Promise<unknown> {
+    const api = getBrowserAPI();
     return new Promise((resolve, reject) => {
-      chrome.tabs.sendMessage(tabId, message, response => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
+      api.tabs.sendMessage(tabId, message, {}, (response) => {
+        try {
+          // Check for errors (Chrome-style)
+          const errorCheck = (api.runtime as any).lastError;
+          if (errorCheck) {
+            reject(new Error(errorCheck.message));
+          } else {
+            resolve(response);
+          }
+        } catch {
+          // Firefox uses Promise-based API
           resolve(response);
         }
       });

@@ -1,4 +1,5 @@
 import { IBadgeService, BadgeColors } from './IBadgeService';
+import { getBrowserAPI, supportsSidePanel } from '@/utils/browserCompat';
 
 export class BadgeService implements IBadgeService {
   private isInitialized = false;
@@ -16,26 +17,48 @@ export class BadgeService implements IBadgeService {
   }
 
   async setText(text: string): Promise<void> {
+    // Firefox doesn't support badges, so gracefully skip
+    if (!supportsSidePanel()) {
+      return;
+    }
+
+    const api = getBrowserAPI();
     return new Promise((resolve, reject) => {
-      chrome.action.setBadgeText({ text }, () => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+      try {
+        const result = api.action.setBadgeText({ text });
+
+        // Handle promise-based API (Firefox) - though unsupported anyway
+        if (result && typeof result.then === 'function') {
+          result.then(() => resolve()).catch(reject);
         } else {
           resolve();
         }
-      });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
   async setColor(color: string): Promise<void> {
+    // Firefox doesn't support badges, so gracefully skip
+    if (!supportsSidePanel()) {
+      return;
+    }
+
+    const api = getBrowserAPI();
     return new Promise((resolve, reject) => {
-      chrome.action.setBadgeBackgroundColor({ color }, () => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+      try {
+        const result = api.action.setBadgeBackgroundColor({ color });
+
+        // Handle promise-based API (Firefox) - though unsupported anyway
+        if (result && typeof result.then === 'function') {
+          result.then(() => resolve()).catch(reject);
         } else {
           resolve();
         }
-      });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 

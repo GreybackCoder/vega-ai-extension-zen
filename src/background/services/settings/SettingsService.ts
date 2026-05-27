@@ -5,6 +5,7 @@ import {
   BackendMode,
 } from '../../../types/settings';
 import { Logger } from '@/utils/logger';
+import { getBrowserAPI } from '@/utils/browserCompat';
 
 const logger = new Logger('SettingsService');
 
@@ -13,7 +14,7 @@ export class SettingsService {
 
   static async getSettings(): Promise<UserSettings> {
     try {
-      const result = await chrome.storage.local.get(this.STORAGE_KEY);
+      const result = await getBrowserAPI().storage.local.get(this.STORAGE_KEY);
       let settings = result[this.STORAGE_KEY] as UserSettings | undefined;
 
       if (!settings) {
@@ -54,7 +55,7 @@ export class SettingsService {
   }
 
   static async saveSettings(settings: UserSettings): Promise<void> {
-    await chrome.storage.local.set({
+    await getBrowserAPI().storage.local.set({
       [this.STORAGE_KEY]: settings,
     });
   }

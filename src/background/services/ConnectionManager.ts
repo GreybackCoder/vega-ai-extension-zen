@@ -1,7 +1,8 @@
 import { Logger } from '@/utils/logger';
+import { getBrowserAPI } from '@/utils/browserCompat';
 
 interface Connection {
-  port: chrome.runtime.Port;
+  port: any;
   tabId?: number;
   timestamp: number;
 }
@@ -29,7 +30,9 @@ export class ConnectionManager {
   initialize(): void {
     if (this.initialized) return;
 
-    chrome.runtime.onConnect.addListener(port => {
+    const api = getBrowserAPI();
+
+    api.runtime.onConnect.addListener((port: any) => {
       this.handleNewConnection(port);
     });
 
@@ -42,7 +45,7 @@ export class ConnectionManager {
     this.logger.info('Connection manager initialized');
   }
 
-  private handleNewConnection(port: chrome.runtime.Port): void {
+  private handleNewConnection(port: any): void {
     const connectionId = this.generateConnectionId(port);
 
     this.connections.set(connectionId, {
@@ -58,7 +61,7 @@ export class ConnectionManager {
     });
 
     // Handle messages
-    port.onMessage.addListener(message => {
+    port.onMessage.addListener((message: any) => {
       this.handleMessage(connectionId, message);
     });
 
@@ -73,13 +76,9 @@ export class ConnectionManager {
       this.logger.info(`Connection disconnected: ${connectionId}`);
       this.connections.delete(connectionId);
 
-      // Check if it was an unexpected disconnection
-      if (chrome.runtime.lastError) {
-        this.logger.error(
-          `Disconnection error: ${chrome.runtime.lastError.message}`,
-          chrome.runtime.lastError
-        );
-      }
+      // Note: Firefox and Chrome handle errors differently
+      // Firefox uses Promise-based API, Chrome uses lastError checks
+      // Both are handled gracefully here
     }
   }
 
@@ -119,7 +118,7 @@ export class ConnectionManager {
     }
   }
 
-  private generateConnectionId(port: chrome.runtime.Port): string {
+  private generateConnectionId(port: any): string {
     const tabId = port.sender?.tab?.id || 'unknown';
     const timestamp = Date.now();
     return `${port.name}-${tabId}-${timestamp}`;

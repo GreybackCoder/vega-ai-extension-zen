@@ -1,4 +1,5 @@
 import { Logger } from '../../../utils/logger';
+import { getBrowserAPI } from '../../../utils/browserCompat';
 
 export enum ErrorCategory {
   NETWORK = 'NETWORK',
@@ -227,8 +228,9 @@ export class ErrorService {
 
   async notifyUser(errorDetails: ErrorDetails): Promise<void> {
     try {
-      if (chrome?.runtime?.sendMessage) {
-        await chrome.runtime.sendMessage({
+      const api = getBrowserAPI();
+      if (api.runtime?.id) {
+        await api.runtime.sendMessage({
           type: 'ERROR_NOTIFICATION',
           payload: {
             message: errorDetails.userMessage,
@@ -237,7 +239,7 @@ export class ErrorService {
           },
         });
       } else {
-        this.logger.warn('Chrome runtime not available for error notification');
+        this.logger.warn('Browser runtime not available for error notification');
       }
     } catch (notificationError) {
       if (

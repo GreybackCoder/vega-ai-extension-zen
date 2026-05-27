@@ -18,6 +18,7 @@ import { errorService } from './services/error';
 import { Logger } from '@/utils/logger';
 import { keepAliveService } from './services/KeepAliveService';
 import { connectionManager } from './services/ConnectionManager';
+import { getBrowserAPI } from '@/utils/browserCompat';
 
 export class ServiceManager {
   private authService: IAuthService;
@@ -283,12 +284,16 @@ export class ServiceManager {
     this.messageService.on(
       MessageType.OPEN_POPUP,
       (message, sender, sendResponse) => {
-        chrome.action.setBadgeText({ text: '!' });
-        chrome.action.setBadgeBackgroundColor({ color: '#3B82F6' });
-
-        setTimeout(() => {
-          chrome.action.setBadgeText({ text: '' });
-        }, 5000);
+        try {
+          const api = getBrowserAPI();
+          api.action.setBadgeText({ text: '!' });
+          api.action.setBadgeBackgroundColor({ color: '#3B82F6' });
+          setTimeout(() => {
+            api.action.setBadgeText({ text: '' });
+          }, 5000);
+        } catch {
+          // Badge not supported on this browser
+        }
 
         sendResponse({ success: true });
         return false;
@@ -304,7 +309,11 @@ export class ServiceManager {
     );
 
     this.messageService.on('CLEAR_BADGE', (message, sender, sendResponse) => {
-      chrome.action.setBadgeText({ text: '' });
+      try {
+        getBrowserAPI().action.setBadgeText({ text: '' });
+      } catch {
+        // Badge not supported on this browser
+      }
       sendResponse({ success: true });
       return false;
     });

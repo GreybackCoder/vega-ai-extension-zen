@@ -1,5 +1,6 @@
 import { Logger } from './logger';
 import { errorService } from '@/background/services/error';
+import { getBrowserAPI } from './browserCompat';
 
 const logger = new Logger('MessageWrapper');
 
@@ -15,11 +16,12 @@ export async function sendMessage<T = unknown>(
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       // Check if extension context is still valid
-      if (!chrome.runtime?.id) {
+      const api = getBrowserAPI();
+      if (!api.runtime?.id) {
         throw new Error('Extension context invalidated');
       }
 
-      const response = await chrome.runtime.sendMessage(message);
+      const response = await api.runtime.sendMessage(message);
       return response;
     } catch (error) {
       const isLastAttempt = attempt === retries;

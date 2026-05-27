@@ -10,6 +10,7 @@ import {
 } from '@/utils/validation';
 import { MessageType } from '@/background/services/message/IMessageService';
 import { JobListing } from '@/types';
+import { getBrowserAPI } from '@/utils/browserCompat';
 
 class Popup {
   private statusElement: HTMLElement;
@@ -39,7 +40,8 @@ class Popup {
     this.ctaElement = document.getElementById('cta')!;
     this.settingsView = document.getElementById('settings-view')!;
     this.captureView = document.getElementById('capture-view')!;
-    this.currentVersion = chrome.runtime.getManifest().version;
+    const api = getBrowserAPI();
+    this.currentVersion = api.runtime.getManifest().version;
 
     this.setupGlobalEventDelegation();
     this.setupAuthStateListener();
@@ -140,7 +142,8 @@ class Popup {
     }
     this.authStateListenerAttached = true;
 
-    chrome.runtime.onMessage.addListener(message => {
+    const api = getBrowserAPI();
+    api.runtime.onMessage.addListener(message => {
       if (message.type === MessageType.AUTH_STATE_CHANGED) {
         if (
           !this.isLoggingIn &&
@@ -179,9 +182,10 @@ class Popup {
       // Note: changeInfo.url requires the "tabs" permission which we don't hold.
       // Use status === 'complete' instead and read the URL from the tab object,
       // which is accessible via the activeTab grant while the panel is open.
-      chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+      const api = getBrowserAPI();
+      api.tabs.onUpdated.addListener((tabId, changeInfo) => {
         if (changeInfo.status !== 'complete' || !shouldRerender()) return;
-        chrome.tabs.query(
+        api.tabs.query(
           { active: true, currentWindow: true },
           ([activeTab]) => {
             if (activeTab?.id !== tabId) return;
@@ -197,7 +201,8 @@ class Popup {
 
   private async checkAuthStatus(): Promise<boolean> {
     try {
-      const result = await chrome.storage.local.get(['authToken']);
+      const api = getBrowserAPI();
+      const result = await api.storage.local.get(['authToken']);
       return !!result.authToken;
     } catch (error) {
       errorService.handleError(error, { action: 'check_auth_status' });
@@ -703,7 +708,8 @@ class Popup {
     passwordBtn.textContent = 'Logging in...';
 
     try {
-      const response = await chrome.runtime.sendMessage({
+      const api = getBrowserAPI();
+      const response = await api.runtime.sendMessage({
         type: 'LOGIN_WITH_PASSWORD',
         payload: { username, password },
         requestId: requestId,
@@ -907,7 +913,8 @@ class Popup {
 
   private async handleLogout(): Promise<void> {
     try {
-      const response = await chrome.runtime.sendMessage({ type: 'LOGOUT' });
+      const api = getBrowserAPI();
+      const response = await api.runtime.sendMessage({ type: 'LOGOUT' });
 
       if (response && response.success) {
         await this.initialize();
@@ -1201,7 +1208,8 @@ class Popup {
   }
 
   private async getCurrentTabUrl(): Promise<string> {
-    const [tab] = await chrome.tabs.query({
+    const api = getBrowserAPI();
+    const [tab] = await api.tabs.query({
       active: true,
       lastFocusedWindow: true,
     });
@@ -1272,7 +1280,7 @@ class Popup {
 
       this.updateDashboardLink();
 
-      const reloadResponse = await chrome.runtime.sendMessage({
+      const reloadResponse = await getBrowserAPI().runtime.sendMessage({
         type: 'RELOAD_SETTINGS',
       });
 
@@ -1671,7 +1679,7 @@ class Popup {
     saveBtn.textContent = 'Saving...';
 
     try {
-      const response = await chrome.runtime.sendMessage({
+      const response = await getBrowserAPI().runtime.sendMessage({
         type: MessageType.SAVE_JOB,
         payload: updatedJob,
       });

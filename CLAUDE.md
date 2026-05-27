@@ -25,6 +25,21 @@ npm run release:patch    # bump version, tag, push triggers CI release
 
 Build output goes to `dist/chrome/` or `dist/firefox/`. Load the dist folder in `chrome://extensions/` (Developer mode → Load unpacked) to test locally. After changing background code, reload the extension; after changing panel code, close and reopen the side panel.
 
+## Firefox / Zen Browser Support
+
+The extension targets both Chrome and Firefox (including Zen, which is Firefox-based). The build is dual-target; output lands in `dist/chrome/` and `dist/firefox/` respectively.
+
+**Key files:**
+- `src/utils/browserCompat.ts` — unified browser API layer. `getBrowserAPI()` uses the build-time `TARGET_BROWSER` constant (set by webpack `DefinePlugin`) via `getTargetBrowser()`. Never call `detectBrowser()` directly — Firefox exposes a `chrome` alias that would fool it.
+- `src/config/platformConfig.ts` — build-time feature flags (`PLATFORM_FEATURES.SUPPORTS_SIDE_PANEL`, etc.)
+- `src/manifest.firefox.json` — Firefox-specific manifest (uses `sidebar_action` for the panel, `action` for the toolbar button, no `sidePanel` permission)
+
+**Rules when adding new browser API calls:**
+- Always go through `getBrowserAPI()` — never call `chrome.*` directly in service/popup code.
+- `api.alarms` for the alarms API (not `chrome.alarms` or `api.runtime.alarms`).
+- Check `supportsSidePanel()` before any `api.sidePanel.*` call — returns false for Firefox.
+- `api.storage.local` handles both Chrome's callback style and Firefox's promise style transparently.
+
 ## Architecture
 
 This is a Chrome MV3 / Firefox browser extension with two webpack entry points:

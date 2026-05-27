@@ -1,6 +1,7 @@
 import { ServiceManager } from './ServiceManager';
 import { errorService } from './services/error';
 import { Logger } from '@/utils/logger';
+import { getBrowserAPI, supportsSidePanel } from '@/utils/browserCompat';
 
 const logger = new Logger('Background');
 const serviceManager = new ServiceManager();
@@ -30,7 +31,8 @@ async function initializeWithRetry(retries = 3): Promise<void> {
 }
 
 // Self-healing: Re-initialize on activation
-chrome.runtime.onStartup.addListener(async () => {
+const api = getBrowserAPI();
+api.runtime.onStartup.addListener(async () => {
   logger.info('Extension startup detected');
   await initializeWithRetry();
 });
@@ -40,21 +42,34 @@ initializeWithRetry().catch(error => {
   logger.error('Fatal: Could not initialize extension', error);
 });
 
-chrome.runtime.onInstalled.addListener(async details => {
-  if (details.reason === 'install') {
+api.runtime.onInstalled.addListener(async details => {
+  if ((details as any).reason === 'install') {
     await serviceManager.badge.showSuccess();
   }
 });
 
-// Open the side panel for the specific tab the user clicked on
-chrome.action.onClicked.addListener(tab => {
-  if (!tab.id) return;
-  chrome.sidePanel.open({ tabId: tab.id }).catch(error => {
-    logger.error('Failed to open side panel', error);
+// Open the side panel for the specific tab the user clicked on (Chrome only)
+// Firefox users get sidebar from manifest, doesn't need manual opening
+if (supportsSidePanel()) {
+  api.action.onClicked.addListener((tab: any) => {
+    if (!tab.id) return;
+    (api.sidePanel as any).open({ tabId: tab.id }).catch((error: any) => {
+      logger.error('Failed to open side panel', error);
+    });
   });
-});
 
-chrome.runtime.onSuspend.addListener(async () => {
+  // Close side panel on tab navigation for normalized behavior
+  api.tabs.onUpdated.addListener((tabId: number, changeInfo: any) => {
+    if (changeInfo.status === 'loading' && changeInfo.url) {
+      // Side panel was open and user navigated, close it
+      (api.sidePanel as any).open({ tabId }).catch(() => {
+        // Ignore errors, side panel might already be closed
+      });
+    }
+  });
+}
+
+api.runtime.onSuspend.addListener(async () => {
   logger.info('Extension suspending, cleaning up...');
   await serviceManager.destroy();
 });
