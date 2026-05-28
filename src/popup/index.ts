@@ -143,7 +143,7 @@ class Popup {
     this.authStateListenerAttached = true;
 
     const api = getBrowserAPI();
-    api.runtime.onMessage.addListener(message => {
+    api.runtime.onMessage.addListener((message: { type: string }) => {
       if (message.type === MessageType.AUTH_STATE_CHANGED) {
         if (
           !this.isLoggingIn &&
@@ -183,17 +183,19 @@ class Popup {
       // Use status === 'complete' instead and read the URL from the tab object,
       // which is accessible via the activeTab grant while the panel is open.
       const api = getBrowserAPI();
-      api.tabs.onUpdated.addListener((tabId, changeInfo) => {
-        if (changeInfo.status !== 'complete' || !shouldRerender()) return;
-        api.tabs.query(
-          { active: true, currentWindow: true },
-          ([activeTab]) => {
-            if (activeTab?.id !== tabId) return;
-            const isJobPage = this.isKnownJobPage(activeTab.url ?? '');
-            if (isJobPage !== this.lastKnownJobPageState) this.initialize();
-          }
-        );
-      });
+      api.tabs.onUpdated.addListener(
+        (tabId: number, changeInfo: { status?: string }) => {
+          if (changeInfo.status !== 'complete' || !shouldRerender()) return;
+          api.tabs.query(
+            { active: true, currentWindow: true },
+            ([activeTab]) => {
+              if (activeTab?.id !== tabId) return;
+              const isJobPage = this.isKnownJobPage(activeTab.url ?? '');
+              if (isJobPage !== this.lastKnownJobPageState) this.initialize();
+            }
+          );
+        }
+      );
     } catch {
       // tab listeners unavailable in some contexts
     }
@@ -202,7 +204,10 @@ class Popup {
   private async checkAuthStatus(): Promise<boolean> {
     try {
       const api = getBrowserAPI();
-      const result = await api.storage.local.get(['authToken']);
+      const result = (await api.storage.local.get(['authToken'])) as Record<
+        string,
+        any
+      >;
       return !!result.authToken;
     } catch (error) {
       errorService.handleError(error, { action: 'check_auth_status' });
@@ -1209,10 +1214,10 @@ class Popup {
 
   private async getCurrentTabUrl(): Promise<string> {
     const api = getBrowserAPI();
-    const [tab] = await api.tabs.query({
+    const [tab] = (await api.tabs.query({
       active: true,
       lastFocusedWindow: true,
-    });
+    })) as any[];
     return tab?.url || '';
   }
 

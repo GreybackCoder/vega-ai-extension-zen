@@ -12,28 +12,54 @@ export interface BrowserRuntime {
   onSuspend: any;
   onMessage: any;
   onConnect: { addListener: (callback: (port: any) => void) => void };
-  sendMessage: (message: any, responseCallback?: (response: any) => void) => void | Promise<any>;
+  sendMessage: (
+    message: any,
+    responseCallback?: (response: any) => void
+  ) => void | Promise<any>;
   getManifest: () => any;
   lastError?: { message?: string };
 }
 
 export interface BrowserAlarms {
-  create: (name: string, alarmInfo: { periodInMinutes?: number; delayInMinutes?: number }) => void | Promise<void>;
+  create: (
+    name: string,
+    alarmInfo: { periodInMinutes?: number; delayInMinutes?: number }
+  ) => void | Promise<void>;
   clear: (name: string) => void | Promise<boolean>;
-  onAlarm: { addListener: (callback: (alarm: { name: string }) => void) => void };
+  onAlarm: {
+    addListener: (callback: (alarm: { name: string }) => void) => void;
+  };
 }
 
 export interface BrowserAction {
   onClicked: any;
-  setBadgeText: (details: { text?: string; tabId?: number }) => void | Promise<void>;
-  setBadgeBackgroundColor: (details: { color: string; tabId?: number }) => void | Promise<void>;
-  setTitle?: (details: { title: string; tabId?: number }) => void | Promise<void>;
+  setBadgeText: (details: {
+    text?: string;
+    tabId?: number;
+  }) => void | Promise<void>;
+  setBadgeBackgroundColor: (details: {
+    color: string;
+    tabId?: number;
+  }) => void | Promise<void>;
+  setTitle?: (details: {
+    title: string;
+    tabId?: number;
+  }) => void | Promise<void>;
 }
 
 export interface BrowserStorageArea {
-  get: (keys: string | string[] | object | null, callback?: (items: Record<string, any>) => void) => Promise<Record<string, any>> | void;
-  set: (items: Record<string, any>, callback?: () => void) => Promise<void> | void;
-  remove: (keys: string | string[], callback?: () => void) => Promise<void> | void;
+  get: (
+    keys: string | string[] | object | null,
+    callback?: (items: Record<string, any>) => void
+  ) => Promise<Record<string, any>> | void;
+  set: (
+    items: Record<string, any>,
+    callback?: () => void
+  ) => Promise<void> | void;
+  remove: (
+    keys: string | string[],
+    callback?: () => void
+  ) => Promise<void> | void;
   clear: (callback?: () => void) => Promise<void> | void;
 }
 
@@ -43,8 +69,16 @@ export interface BrowserStorage {
 }
 
 export interface BrowserTabs {
-  query: (queryInfo: any, callback?: (tabs: any[]) => void) => Promise<any[]> | void;
-  sendMessage: (tabId: number, message: any, options?: any, responseCallback?: (response: any) => void) => void | Promise<any>;
+  query: (
+    queryInfo: any,
+    callback?: (tabs: any[]) => void
+  ) => Promise<any[]> | void;
+  sendMessage: (
+    tabId: number,
+    message: any,
+    options?: any,
+    responseCallback?: (response: any) => void
+  ) => void | Promise<any>;
   onUpdated: any;
 }
 
@@ -73,7 +107,12 @@ export function detectBrowser(): BrowserType {
   }
 
   // Check for Firefox API
-  if (typeof browser !== 'undefined' && (browser as any).runtime && (browser as any).runtime.id) {
+  const globalBrowser = (globalThis as any).browser;
+  if (
+    typeof globalBrowser !== 'undefined' &&
+    globalBrowser.runtime &&
+    globalBrowser.runtime.id
+  ) {
     return 'firefox';
   }
 
@@ -101,13 +140,18 @@ export function getBrowserAPI(): UnifiedBrowserAPI {
  */
 function getChromeAPI(): UnifiedBrowserAPI {
   // Promisify callback-based storage API
-  const promisifyStorageArea = (area: chrome.storage.StorageArea): BrowserStorageArea => ({
-    get: (keys: string | string[] | object | null, callback?: (items: Record<string, any>) => void) => {
+  const promisifyStorageArea = (
+    area: chrome.storage.StorageArea
+  ): BrowserStorageArea => ({
+    get: (
+      keys: string | string[] | object | null,
+      callback?: (items: Record<string, any>) => void
+    ) => {
       if (callback) {
         return area.get(keys, callback);
       }
       return new Promise(resolve => {
-        area.get(keys, (items) => resolve(items));
+        area.get(keys, items => resolve(items));
       });
     },
     set: (items: Record<string, any>, callback?: () => void) => {
@@ -143,15 +187,25 @@ function getChromeAPI(): UnifiedBrowserAPI {
         return chrome.tabs.query(queryInfo, callback);
       }
       return new Promise(resolve => {
-        chrome.tabs.query(queryInfo, (tabs) => resolve(tabs));
+        chrome.tabs.query(queryInfo, tabs => resolve(tabs));
       });
     },
-    sendMessage: (tabId: number, message: any, options?: any, responseCallback?: (response: any) => void) => {
+    sendMessage: (
+      tabId: number,
+      message: any,
+      options?: any,
+      responseCallback?: (response: any) => void
+    ) => {
       if (responseCallback) {
-        return chrome.tabs.sendMessage(tabId, message, options, responseCallback);
+        return chrome.tabs.sendMessage(
+          tabId,
+          message,
+          options,
+          responseCallback
+        );
       }
       return new Promise((resolve, reject) => {
-        chrome.tabs.sendMessage(tabId, message, options, (response) => {
+        chrome.tabs.sendMessage(tabId, message, options, response => {
           if (chrome.runtime.lastError) {
             reject(chrome.runtime.lastError);
           } else {
@@ -208,7 +262,9 @@ function getFirefoxAPI(): UnifiedBrowserAPI {
     action: actionAPI as BrowserAction,
     storage: {
       local: promisifyStorageArea(browserAPI.storage.local),
-      sync: browserAPI.storage.sync ? promisifyStorageArea(browserAPI.storage.sync) : undefined,
+      sync: browserAPI.storage.sync
+        ? promisifyStorageArea(browserAPI.storage.sync)
+        : undefined,
     },
     tabs: browserAPI.tabs as BrowserTabs,
     sidePanel: undefined,
@@ -223,7 +279,8 @@ function getFirefoxAPI(): UnifiedBrowserAPI {
  * Set at build time by webpack DefinePlugin
  */
 export function getTargetBrowser(): BrowserType {
-  const targetBrowser = (typeof process !== 'undefined' && (process as any).env?.TARGET_BROWSER) as BrowserType | undefined;
+  const targetBrowser = (typeof process !== 'undefined' &&
+    (process as any).env?.TARGET_BROWSER) as BrowserType | undefined;
   return targetBrowser || detectBrowser();
 }
 

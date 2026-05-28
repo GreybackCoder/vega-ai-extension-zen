@@ -9,7 +9,7 @@ export class StorageService implements IStorageService {
 
   constructor(area: StorageArea = 'local') {
     const api = getBrowserAPI();
-    this.area = api.storage[area];
+    this.area = (api.storage as Record<string, any>)[area];
   }
 
   async initialize(): Promise<void> {
@@ -31,10 +31,12 @@ export class StorageService implements IStorageService {
 
         // Handle promise-based API (Firefox)
         if (result && typeof result.then === 'function') {
-          result.then((items: Record<string, any>) => {
-            const value = items[key] !== undefined ? items[key] : null;
-            resolve(value as T | null);
-          }).catch(() => resolve(null));
+          result
+            .then((items: Record<string, any>) => {
+              const value = items[key] !== undefined ? items[key] : null;
+              resolve(value as T | null);
+            })
+            .catch(() => resolve(null));
         }
       } catch (error) {
         this.logger.error('Storage get error', error);
@@ -105,9 +107,11 @@ export class StorageService implements IStorageService {
 
         // Handle promise-based API (Firefox)
         if (result && typeof result.then === 'function') {
-          result.then((items: Record<string, any>) => {
-            resolve(items as Partial<T>);
-          }).catch(() => resolve({} as Partial<T>));
+          result
+            .then((items: Record<string, any>) => {
+              resolve(items as Partial<T>);
+            })
+            .catch(() => resolve({} as Partial<T>));
         }
       } catch (error) {
         this.logger.error('Storage getMultiple error', error);

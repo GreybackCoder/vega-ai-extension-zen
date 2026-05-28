@@ -42,7 +42,7 @@ initializeWithRetry().catch(error => {
   logger.error('Fatal: Could not initialize extension', error);
 });
 
-api.runtime.onInstalled.addListener(async details => {
+api.runtime.onInstalled.addListener(async (details: { reason: string }) => {
   if ((details as any).reason === 'install') {
     await serviceManager.badge.showSuccess();
   }

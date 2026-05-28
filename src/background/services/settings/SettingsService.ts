@@ -14,7 +14,9 @@ export class SettingsService {
 
   static async getSettings(): Promise<UserSettings> {
     try {
-      const result = await getBrowserAPI().storage.local.get(this.STORAGE_KEY);
+      const result = (await getBrowserAPI().storage.local.get(
+        this.STORAGE_KEY
+      )) as Record<string, any>;
       let settings = result[this.STORAGE_KEY] as UserSettings | undefined;
 
       if (!settings) {
