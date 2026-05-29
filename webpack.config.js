@@ -6,7 +6,7 @@ const packageJson = require('./package.json');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
-  const targetBrowser = argv.target || 'chrome';
+  const targetBrowser = (env && env.target) || 'chrome';
   const isChrome = targetBrowser === 'chrome';
   const isFirefox = targetBrowser === 'firefox';
 
