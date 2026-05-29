@@ -239,7 +239,9 @@ export class ErrorService {
           },
         });
       } else {
-        this.logger.warn('Browser runtime not available for error notification');
+        this.logger.warn(
+          'Browser runtime not available for error notification'
+        );
       }
     } catch (notificationError) {
       if (

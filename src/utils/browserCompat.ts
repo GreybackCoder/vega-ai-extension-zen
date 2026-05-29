@@ -5,18 +5,80 @@
 
 export type BrowserType = 'chrome' | 'firefox' | 'unknown';
 
+export interface BrowserMessageSender {
+  tab?: { id?: number; url?: string };
+  frameId?: number;
+  id?: string;
+  url?: string;
+  origin?: string;
+}
+
+export interface BrowserTab {
+  id?: number;
+  url?: string;
+  active?: boolean;
+  windowId?: number;
+  index?: number;
+  pinned?: boolean;
+  highlighted?: boolean;
+  incognito?: boolean;
+  title?: string;
+}
+
+export interface BrowserTabChangeInfo {
+  status?: string;
+  url?: string;
+  pinned?: boolean;
+  title?: string;
+  favIconUrl?: string;
+}
+
+export interface BrowserPort {
+  name: string;
+  disconnect(): void;
+  onDisconnect: {
+    addListener: (callback: (port: BrowserPort) => void) => void;
+  };
+  onMessage: { addListener: (callback: (message: unknown) => void) => void };
+  postMessage(message: Record<string, unknown>): void;
+  sender?: { tab?: { id?: number }; url?: string };
+}
+
+export interface MessageResponse {
+  success?: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
 export interface BrowserRuntime {
   id: string;
-  onInstalled: any;
-  onStartup: any;
-  onSuspend: any;
-  onMessage: any;
-  onConnect: { addListener: (callback: (port: any) => void) => void };
+  onInstalled: {
+    addListener: (callback: (details: { reason: string }) => void) => void;
+  };
+  onStartup: { addListener: (callback: () => void) => void };
+  onSuspend: { addListener: (callback: () => void) => void };
+  onMessage: {
+    addListener(
+      callback: (
+        message: { type: string },
+        sender: chrome.runtime.MessageSender,
+        sendResponse: (response?: unknown) => void
+      ) => boolean | void
+    ): void;
+    removeListener(
+      callback: (
+        message: { type: string },
+        sender: chrome.runtime.MessageSender,
+        sendResponse: (response?: unknown) => void
+      ) => boolean | void
+    ): void;
+  };
+  onConnect: { addListener: (callback: (port: BrowserPort) => void) => void };
   sendMessage: (
-    message: any,
-    responseCallback?: (response: any) => void
-  ) => void | Promise<any>;
-  getManifest: () => any;
+    message: unknown,
+    responseCallback?: (response: MessageResponse) => void
+  ) => void | Promise<MessageResponse>;
+  getManifest: () => { version: string; [key: string]: unknown };
   lastError?: { message?: string };
 }
 
@@ -32,7 +94,7 @@ export interface BrowserAlarms {
 }
 
 export interface BrowserAction {
-  onClicked: any;
+  onClicked: { addListener: (callback: (tab: BrowserTab) => void) => void };
   setBadgeText: (details: {
     text?: string;
     tabId?: number;
@@ -50,10 +112,10 @@ export interface BrowserAction {
 export interface BrowserStorageArea {
   get: (
     keys: string | string[] | object | null,
-    callback?: (items: Record<string, any>) => void
-  ) => Promise<Record<string, any>> | void;
+    callback?: (items: Record<string, unknown>) => void
+  ) => Promise<Record<string, unknown>> | void;
   set: (
-    items: Record<string, any>,
+    items: Record<string, unknown>,
     callback?: () => void
   ) => Promise<void> | void;
   remove: (
@@ -70,16 +132,24 @@ export interface BrowserStorage {
 
 export interface BrowserTabs {
   query: (
-    queryInfo: any,
-    callback?: (tabs: any[]) => void
-  ) => Promise<any[]> | void;
+    queryInfo: Record<string, unknown>,
+    callback?: (tabs: BrowserTab[]) => void
+  ) => Promise<BrowserTab[]> | void;
   sendMessage: (
     tabId: number,
-    message: any,
-    options?: any,
-    responseCallback?: (response: any) => void
-  ) => void | Promise<any>;
-  onUpdated: any;
+    message: unknown,
+    options?: Record<string, unknown>,
+    responseCallback?: (response: unknown) => void
+  ) => void | Promise<unknown>;
+  onUpdated: {
+    addListener: (
+      callback: (
+        tabId: number,
+        changeInfo: BrowserTabChangeInfo,
+        tab: BrowserTab
+      ) => void
+    ) => void;
+  };
 }
 
 export interface BrowserSidePanel {
@@ -107,11 +177,12 @@ export function detectBrowser(): BrowserType {
   }
 
   // Check for Firefox API
-  const globalBrowser = (globalThis as any).browser;
+  const globalBrowser = (globalThis as Record<string, unknown>).browser;
   if (
-    typeof globalBrowser !== 'undefined' &&
-    globalBrowser.runtime &&
-    globalBrowser.runtime.id
+    globalBrowser !== null &&
+    typeof globalBrowser === 'object' &&
+    'runtime' in globalBrowser &&
+    (globalBrowser as { runtime?: { id?: string } }).runtime?.id
   ) {
     return 'firefox';
   }
@@ -139,22 +210,24 @@ export function getBrowserAPI(): UnifiedBrowserAPI {
  * Chrome-specific API wrapper
  */
 function getChromeAPI(): UnifiedBrowserAPI {
-  // Promisify callback-based storage API
   const promisifyStorageArea = (
     area: chrome.storage.StorageArea
   ): BrowserStorageArea => ({
     get: (
       keys: string | string[] | object | null,
-      callback?: (items: Record<string, any>) => void
+      callback?: (items: Record<string, unknown>) => void
     ) => {
       if (callback) {
-        return area.get(keys, callback);
+        return area.get(
+          keys,
+          callback as (items: { [key: string]: unknown }) => void
+        );
       }
       return new Promise(resolve => {
-        area.get(keys, items => resolve(items));
+        area.get(keys, items => resolve(items as Record<string, unknown>));
       });
     },
-    set: (items: Record<string, any>, callback?: () => void) => {
+    set: (items: Record<string, unknown>, callback?: () => void) => {
       if (callback) {
         return area.set(items, callback);
       }
@@ -180,46 +253,58 @@ function getChromeAPI(): UnifiedBrowserAPI {
     },
   });
 
-  // Promisify tabs API
   const promisifyTabs = (): BrowserTabs => ({
-    query: (queryInfo: any, callback?: (tabs: any[]) => void) => {
+    query: (
+      queryInfo: Record<string, unknown>,
+      callback?: (tabs: BrowserTab[]) => void
+    ) => {
       if (callback) {
-        return chrome.tabs.query(queryInfo, callback);
+        return chrome.tabs.query(
+          queryInfo as chrome.tabs.QueryInfo,
+          callback as (tabs: chrome.tabs.Tab[]) => void
+        );
       }
       return new Promise(resolve => {
-        chrome.tabs.query(queryInfo, tabs => resolve(tabs));
+        chrome.tabs.query(queryInfo as chrome.tabs.QueryInfo, tabs =>
+          resolve(tabs as BrowserTab[])
+        );
       });
     },
     sendMessage: (
       tabId: number,
-      message: any,
-      options?: any,
-      responseCallback?: (response: any) => void
+      message: unknown,
+      options?: Record<string, unknown>,
+      responseCallback?: (response: unknown) => void
     ) => {
       if (responseCallback) {
         return chrome.tabs.sendMessage(
           tabId,
           message,
-          options,
+          options as chrome.tabs.MessageSendOptions,
           responseCallback
         );
       }
       return new Promise((resolve, reject) => {
-        chrome.tabs.sendMessage(tabId, message, options, response => {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-          } else {
-            resolve(response);
+        chrome.tabs.sendMessage(
+          tabId,
+          message,
+          options as chrome.tabs.MessageSendOptions,
+          response => {
+            if (chrome.runtime.lastError) {
+              reject(chrome.runtime.lastError);
+            } else {
+              resolve(response);
+            }
           }
-        });
+        );
       });
     },
-    onUpdated: chrome.tabs.onUpdated,
+    onUpdated: chrome.tabs.onUpdated as unknown as BrowserTabs['onUpdated'],
   });
 
   return {
-    runtime: chrome.runtime as BrowserRuntime,
-    action: chrome.action as BrowserAction,
+    runtime: chrome.runtime as unknown as BrowserRuntime,
+    action: chrome.action as unknown as BrowserAction,
     storage: {
       local: promisifyStorageArea(chrome.storage.local),
       sync: promisifyStorageArea(chrome.storage.sync),
@@ -232,33 +317,44 @@ function getChromeAPI(): UnifiedBrowserAPI {
   };
 }
 
+type FirefoxStorageArea = {
+  get(
+    keys: string | string[] | object | null
+  ): Promise<Record<string, unknown>>;
+  set(items: Record<string, unknown>): Promise<void>;
+  remove(keys: string | string[]): Promise<void>;
+  clear(): Promise<void>;
+};
+
+type FirefoxAPI = {
+  runtime: BrowserRuntime;
+  storage: { local: FirefoxStorageArea; sync?: FirefoxStorageArea };
+  tabs: BrowserTabs;
+  alarms: BrowserAlarms;
+  browserAction?: BrowserAction;
+  action?: BrowserAction;
+};
+
 /**
  * Firefox-specific API wrapper
  */
 function getFirefoxAPI(): UnifiedBrowserAPI {
-  const browserAPI = (globalThis as any).browser;
+  const browserAPI = (globalThis as Record<string, unknown>)
+    .browser as FirefoxAPI;
 
-  // Firefox uses Promise-based storage API
-  const promisifyStorageArea = (area: any): BrowserStorageArea => ({
-    get: (keys: string | string[] | object | null) => {
-      return area.get(keys);
-    },
-    set: (items: Record<string, any>) => {
-      return area.set(items);
-    },
-    remove: (keys: string | string[]) => {
-      return area.remove(keys);
-    },
-    clear: () => {
-      return area.clear();
-    },
+  const promisifyStorageArea = (
+    area: FirefoxStorageArea
+  ): BrowserStorageArea => ({
+    get: (keys: string | string[] | object | null) => area.get(keys),
+    set: (items: Record<string, unknown>) => area.set(items),
+    remove: (keys: string | string[]) => area.remove(keys),
+    clear: () => area.clear(),
   });
 
-  // Firefox browserAction is similar to Chrome action
-  const actionAPI = browserAPI.browserAction || browserAPI.action;
+  const actionAPI = browserAPI.browserAction ?? browserAPI.action;
 
   return {
-    runtime: browserAPI.runtime as BrowserRuntime,
+    runtime: browserAPI.runtime,
     action: actionAPI as BrowserAction,
     storage: {
       local: promisifyStorageArea(browserAPI.storage.local),
@@ -266,9 +362,9 @@ function getFirefoxAPI(): UnifiedBrowserAPI {
         ? promisifyStorageArea(browserAPI.storage.sync)
         : undefined,
     },
-    tabs: browserAPI.tabs as BrowserTabs,
+    tabs: browserAPI.tabs,
     sidePanel: undefined,
-    alarms: browserAPI.alarms as BrowserAlarms,
+    alarms: browserAPI.alarms,
     isPopupOnly: true,
     supportsSidePanel: false,
   };
@@ -279,9 +375,14 @@ function getFirefoxAPI(): UnifiedBrowserAPI {
  * Set at build time by webpack DefinePlugin
  */
 export function getTargetBrowser(): BrowserType {
-  const targetBrowser = (typeof process !== 'undefined' &&
-    (process as any).env?.TARGET_BROWSER) as BrowserType | undefined;
-  return targetBrowser || detectBrowser();
+  if (typeof process !== 'undefined') {
+    const env = (process as { env?: { TARGET_BROWSER?: string } }).env;
+    const target = env?.TARGET_BROWSER;
+    if (target === 'chrome' || target === 'firefox') {
+      return target;
+    }
+  }
+  return detectBrowser();
 }
 
 /**

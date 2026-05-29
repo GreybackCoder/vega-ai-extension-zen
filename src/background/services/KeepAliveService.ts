@@ -37,7 +37,7 @@ export class KeepAliveService {
         delayInMinutes: 0,
       });
 
-      api.alarms?.onAlarm.addListener((alarm) => {
+      api.alarms?.onAlarm.addListener(alarm => {
         if (alarm.name === this.ALARM_NAME) {
           this.handleKeepAlive();
         }
@@ -55,9 +55,7 @@ export class KeepAliveService {
 
     // Perform a simple storage operation to ensure activity
     const api = getBrowserAPI();
-    api.storage.local.get(['lastPing'], (result: Record<string, any>) => {
-      api.storage.local.set({ lastPing: Date.now() });
-    });
+    void api.storage.local.set({ lastPing: Date.now() });
   }
 
   async destroy(): Promise<void> {

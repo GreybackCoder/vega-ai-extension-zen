@@ -13,7 +13,9 @@ declare const process: {
   };
 };
 
-export const TARGET_BROWSER = (process.env.TARGET_BROWSER || 'chrome') as 'chrome' | 'firefox';
+export const TARGET_BROWSER = (process.env.TARGET_BROWSER || 'chrome') as
+  | 'chrome'
+  | 'firefox';
 
 /**
  * Feature flags based on target browser
@@ -47,7 +49,8 @@ export const CONFIG = {
   uiMode: TARGET_BROWSER === 'chrome' ? 'side-panel' : 'sidebar-popup',
 
   // Maximum storage quota (conservative estimate)
-  maxStorageBytes: TARGET_BROWSER === 'chrome' ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
+  maxStorageBytes:
+    TARGET_BROWSER === 'chrome' ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
 } as const;
 
 /**

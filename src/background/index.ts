@@ -1,7 +1,12 @@
 import { ServiceManager } from './ServiceManager';
 import { errorService } from './services/error';
 import { Logger } from '@/utils/logger';
-import { getBrowserAPI, supportsSidePanel } from '@/utils/browserCompat';
+import {
+  getBrowserAPI,
+  supportsSidePanel,
+  BrowserTab,
+  BrowserTabChangeInfo,
+} from '@/utils/browserCompat';
 
 const logger = new Logger('Background');
 const serviceManager = new ServiceManager();
@@ -43,7 +48,7 @@ initializeWithRetry().catch(error => {
 });
 
 api.runtime.onInstalled.addListener(async (details: { reason: string }) => {
-  if ((details as any).reason === 'install') {
+  if (details.reason === 'install') {
     await serviceManager.badge.showSuccess();
   }
 });
@@ -51,22 +56,24 @@ api.runtime.onInstalled.addListener(async (details: { reason: string }) => {
 // Open the side panel for the specific tab the user clicked on (Chrome only)
 // Firefox users get sidebar from manifest, doesn't need manual opening
 if (supportsSidePanel()) {
-  api.action.onClicked.addListener((tab: any) => {
+  api.action.onClicked.addListener((tab: BrowserTab) => {
     if (!tab.id) return;
-    (api.sidePanel as any).open({ tabId: tab.id }).catch((error: any) => {
+    api.sidePanel?.open?.({ tabId: tab.id }).catch((error: unknown) => {
       logger.error('Failed to open side panel', error);
     });
   });
 
   // Close side panel on tab navigation for normalized behavior
-  api.tabs.onUpdated.addListener((tabId: number, changeInfo: any) => {
-    if (changeInfo.status === 'loading' && changeInfo.url) {
-      // Side panel was open and user navigated, close it
-      (api.sidePanel as any).open({ tabId }).catch(() => {
-        // Ignore errors, side panel might already be closed
-      });
+  api.tabs.onUpdated.addListener(
+    (tabId: number, changeInfo: BrowserTabChangeInfo) => {
+      if (changeInfo.status === 'loading' && changeInfo.url) {
+        // Side panel was open and user navigated, close it
+        api.sidePanel?.open?.({ tabId }).catch(() => {
+          // Ignore errors, side panel might already be closed
+        });
+      }
     }
-  });
+  );
 }
 
 api.runtime.onSuspend.addListener(async () => {

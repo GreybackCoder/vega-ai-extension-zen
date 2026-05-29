@@ -206,7 +206,7 @@ class Popup {
       const api = getBrowserAPI();
       const result = (await api.storage.local.get(['authToken'])) as Record<
         string,
-        any
+        unknown
       >;
       return !!result.authToken;
     } catch (error) {
@@ -1214,10 +1214,9 @@ class Popup {
 
   private async getCurrentTabUrl(): Promise<string> {
     const api = getBrowserAPI();
-    const [tab] = (await api.tabs.query({
-      active: true,
-      lastFocusedWindow: true,
-    })) as any[];
+    const tabs =
+      (await api.tabs.query({ active: true, lastFocusedWindow: true })) ?? [];
+    const [tab] = tabs;
     return tab?.url || '';
   }
 

@@ -16,7 +16,7 @@ export class SettingsService {
     try {
       const result = (await getBrowserAPI().storage.local.get(
         this.STORAGE_KEY
-      )) as Record<string, any>;
+      )) as Record<string, unknown>;
       let settings = result[this.STORAGE_KEY] as UserSettings | undefined;
 
       if (!settings) {

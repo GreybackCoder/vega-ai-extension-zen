@@ -1,8 +1,8 @@
 import { Logger } from '@/utils/logger';
-import { getBrowserAPI } from '@/utils/browserCompat';
+import { getBrowserAPI, BrowserPort } from '@/utils/browserCompat';
 
 interface Connection {
-  port: any;
+  port: BrowserPort;
   tabId?: number;
   timestamp: number;
 }
@@ -32,7 +32,7 @@ export class ConnectionManager {
 
     const api = getBrowserAPI();
 
-    api.runtime.onConnect.addListener((port: any) => {
+    api.runtime.onConnect.addListener((port: BrowserPort) => {
       this.handleNewConnection(port);
     });
 
@@ -45,7 +45,7 @@ export class ConnectionManager {
     this.logger.info('Connection manager initialized');
   }
 
-  private handleNewConnection(port: any): void {
+  private handleNewConnection(port: BrowserPort): void {
     const connectionId = this.generateConnectionId(port);
 
     this.connections.set(connectionId, {
@@ -61,7 +61,7 @@ export class ConnectionManager {
     });
 
     // Handle messages
-    port.onMessage.addListener((message: any) => {
+    port.onMessage.addListener((message: unknown) => {
       this.handleMessage(connectionId, message);
     });
 
@@ -82,10 +82,8 @@ export class ConnectionManager {
     }
   }
 
-  private handleMessage(
-    connectionId: string,
-    message: { type: string; [key: string]: unknown }
-  ): void {
+  private handleMessage(connectionId: string, message: unknown): void {
+    const typedMessage = message as { type?: string };
     const connection = this.connections.get(connectionId);
 
     if (connection) {
@@ -93,7 +91,7 @@ export class ConnectionManager {
       connection.timestamp = Date.now();
 
       // Handle ping messages to keep connection alive
-      if (message.type === 'PING') {
+      if (typedMessage.type === 'PING') {
         connection.port.postMessage({ type: 'PONG', timestamp: Date.now() });
       }
     }
@@ -118,7 +116,7 @@ export class ConnectionManager {
     }
   }
 
-  private generateConnectionId(port: any): string {
+  private generateConnectionId(port: BrowserPort): string {
     const tabId = port.sender?.tab?.id || 'unknown';
     const timestamp = Date.now();
     return `${port.name}-${tabId}-${timestamp}`;

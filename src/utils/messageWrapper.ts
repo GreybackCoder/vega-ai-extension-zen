@@ -22,7 +22,7 @@ export async function sendMessage<T = unknown>(
       }
 
       const response = await api.runtime.sendMessage(message);
-      return response;
+      return response as unknown as T;
     } catch (error) {
       const isLastAttempt = attempt === retries;
 

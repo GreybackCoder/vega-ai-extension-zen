@@ -200,14 +200,19 @@ export class MultiProviderAuthService implements IAuthService {
       type: MessageType.AUTH_STATE_CHANGED,
       payload: { isAuthenticated },
     });
-    if (sendPromise && typeof (sendPromise as Promise<unknown>).catch === 'function') {
+    if (
+      sendPromise &&
+      typeof (sendPromise as Promise<unknown>).catch === 'function'
+    ) {
       (sendPromise as Promise<unknown>).catch((error: unknown) => {
         const msg = error instanceof Error ? error.message : '';
         if (
           !msg.includes('Could not establish connection') &&
           !msg.includes('Receiving end does not exist')
         ) {
-          authLogger.warn('Failed to broadcast auth state to runtime', { error: msg });
+          authLogger.warn('Failed to broadcast auth state to runtime', {
+            error: msg,
+          });
         }
       });
     }

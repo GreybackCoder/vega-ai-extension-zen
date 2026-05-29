@@ -12,8 +12,8 @@ export class MessageService implements IMessageService {
   private logger = new Logger('MessageService');
   private messageListener:
     | ((
-        message: ExtensionMessage,
-        sender: any,
+        message: { type: string },
+        sender: chrome.runtime.MessageSender,
         sendResponse: (response?: unknown) => void
       ) => boolean)
     | null = null;
@@ -24,11 +24,12 @@ export class MessageService implements IMessageService {
     const api = getBrowserAPI();
 
     this.messageListener = (
-      message: ExtensionMessage,
-      sender: any,
+      message: { type: string },
+      _sender: chrome.runtime.MessageSender,
       sendResponse: (response?: unknown) => void
     ) => {
-      const handlers = this.handlers.get(message.type);
+      const extensionMessage = message as ExtensionMessage;
+      const handlers = this.handlers.get(extensionMessage.type);
       if (!handlers || handlers.size === 0) {
         return false;
       }
@@ -37,13 +38,13 @@ export class MessageService implements IMessageService {
 
       handlers.forEach(handler => {
         try {
-          const result = handler(message, sender, sendResponse);
+          const result = handler(extensionMessage, _sender, sendResponse);
           if (result === true) {
             isAsync = true;
           }
         } catch (error) {
           this.logger.error(
-            `Error in message handler for ${message.type}`,
+            `Error in message handler for ${extensionMessage.type}`,
             error
           );
           sendResponse({
@@ -95,10 +96,10 @@ export class MessageService implements IMessageService {
   async sendToTab(tabId: number, message: ExtensionMessage): Promise<unknown> {
     const api = getBrowserAPI();
     return new Promise((resolve, reject) => {
-      api.tabs.sendMessage(tabId, message, {}, (response) => {
+      api.tabs.sendMessage(tabId, message, {}, response => {
         try {
           // Check for errors (Chrome-style)
-          const errorCheck = (api.runtime as any).lastError;
+          const errorCheck = api.runtime.lastError;
           if (errorCheck) {
             reject(new Error(errorCheck.message));
           } else {

@@ -1,15 +1,18 @@
 import { IStorageService, StorageArea } from './IStorageService';
 import { Logger } from '@/utils/logger';
-import { getBrowserAPI } from '@/utils/browserCompat';
+import { getBrowserAPI, BrowserStorageArea } from '@/utils/browserCompat';
 
 export class StorageService implements IStorageService {
-  private area: any;
+  private area: BrowserStorageArea;
   private isInitialized = false;
   private logger = new Logger('StorageService');
 
   constructor(area: StorageArea = 'local') {
     const api = getBrowserAPI();
-    this.area = (api.storage as Record<string, any>)[area];
+    this.area =
+      (
+        api.storage as unknown as Record<string, BrowserStorageArea | undefined>
+      )[area] ?? api.storage.local;
   }
 
   async initialize(): Promise<void> {
@@ -24,7 +27,7 @@ export class StorageService implements IStorageService {
   async get<T>(key: string): Promise<T | null> {
     return new Promise(resolve => {
       try {
-        const result = this.area.get(key, (items: Record<string, any>) => {
+        const result = this.area.get(key, (items: Record<string, unknown>) => {
           const value = items[key] !== undefined ? items[key] : null;
           resolve(value as T | null);
         });
@@ -32,7 +35,7 @@ export class StorageService implements IStorageService {
         // Handle promise-based API (Firefox)
         if (result && typeof result.then === 'function') {
           result
-            .then((items: Record<string, any>) => {
+            .then((items: Record<string, unknown>) => {
               const value = items[key] !== undefined ? items[key] : null;
               resolve(value as T | null);
             })
@@ -101,14 +104,14 @@ export class StorageService implements IStorageService {
   ): Promise<Partial<T>> {
     return new Promise(resolve => {
       try {
-        const result = this.area.get(keys, (items: Record<string, any>) => {
+        const result = this.area.get(keys, (items: Record<string, unknown>) => {
           resolve(items as Partial<T>);
         });
 
         // Handle promise-based API (Firefox)
         if (result && typeof result.then === 'function') {
           result
-            .then((items: Record<string, any>) => {
+            .then((items: Record<string, unknown>) => {
               resolve(items as Partial<T>);
             })
             .catch(() => resolve({} as Partial<T>));
