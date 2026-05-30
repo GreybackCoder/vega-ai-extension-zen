@@ -1448,9 +1448,13 @@ class Popup {
         throw new Error('Invalid configuration');
       }
 
-      const isConnected = await SettingsService.testConnection(host, protocol);
+      const api = getBrowserAPI();
+      const response = (await api.runtime.sendMessage({
+        type: MessageType.TEST_CONNECTION,
+        payload: { host, protocol },
+      })) as { success: boolean } | undefined;
 
-      if (isConnected) {
+      if (response?.success) {
         this.showNotification('Connected', 'success');
       } else {
         throw new Error('Connection failed');

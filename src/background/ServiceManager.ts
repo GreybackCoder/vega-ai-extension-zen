@@ -12,6 +12,7 @@ import {
 } from './services';
 import { MultiProviderAuthService } from './services/auth/MultiProviderAuthService';
 import { DynamicConfig } from '@/config/dynamicConfig';
+import { SettingsService } from './services/settings/SettingsService';
 import { JobListing, AuthProviderType } from '@/types';
 import { AuthCredentials } from './services/auth/IAuthProvider';
 import { errorService } from './services/error';
@@ -317,6 +318,24 @@ export class ServiceManager {
       sendResponse({ success: true });
       return false;
     });
+
+    this.messageService.on(
+      MessageType.TEST_CONNECTION,
+      (message, sender, sendResponse) => {
+        const { host, protocol } = message.payload as {
+          host: string;
+          protocol: 'http' | 'https';
+        };
+        SettingsService.testConnection(host, protocol)
+          .then(isConnected => {
+            sendResponse({ success: isConnected });
+          })
+          .catch(() => {
+            sendResponse({ success: false });
+          });
+        return true;
+      }
+    );
   }
 
   private async handleReloadSettings(

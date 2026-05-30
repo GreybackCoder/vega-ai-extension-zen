@@ -59,4 +59,7 @@ export enum MessageType {
 
   // UI-related messages
   OPEN_POPUP = 'OPEN_POPUP',
+
+  // Settings-related messages
+  TEST_CONNECTION = 'TEST_CONNECTION',
 }
